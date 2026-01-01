@@ -1,0 +1,12 @@
+[project]
+name = "121x-bot-py"
+version = "0.1.0"
+description = "A Discord bot for managing a long-lasting TA Discord server"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "hikari-arc>=2.1.1",
+    "hikari-miru>=4.2.0",
+    "hikari[speedups]>=2.5.0",
+    "python-dotenv>=1.2.1",
+]
