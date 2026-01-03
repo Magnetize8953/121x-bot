@@ -148,7 +148,7 @@ async def claim(
 
     _, courses, leads, sections, teams = res
     courses = courses.split()
-    leads = leads.split()
+    leads = leads.split() if leads is not None else None
     sections = sections.split()
     teams = teams.split()
 
