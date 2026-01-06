@@ -49,8 +49,8 @@ async def assignments(
 
 @roles.include
 @arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
-@arc.slash_subcommand("individual", "Create a new role and add it to the database for later assignment")
-async def individual(
+@arc.slash_subcommand("create", "Create a new role and add it to the database for later assignment")
+async def create(
     ctx: arc.GatewayContext,
     name: arc.Option[str, arc.StrParams("Name of the role to create")],
 ) -> None:
@@ -63,6 +63,31 @@ async def individual(
     # currently, the role new gets added as the last
     # rest function reposition_role() does this, it's just a matter of modularising the ordering
     # await plugin.client.rest.reposition_roles(ctx.guild_id, { <int>: role.id })
+
+    values = {
+        "role": name,
+        "discord_id": role.id,
+    }
+    curr.execute(f"INSERT INTO {config.ROLE_TABLE} VALUES(:role, :discord_id)", values)
+    conn.commit()
+
+    await ctx.respond("Role created and saved to database")
+
+
+@roles.include
+@arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
+@arc.slash_subcommand("individual", "Add an individual existing role to database")
+async def individual(
+    ctx: arc.GatewayContext,
+    role: arc.Option[hikari.Role, arc.RoleParams("Role to add")],
+    name: arc.Option[str, arc.StrParams("Name to use in database. Defaults to role name with spaces replaced with underscores (_)")] = "",
+) -> None:
+
+    if conn is None or curr is None:
+        raise RuntimeError("Database did not properly connect during loading")
+
+    if name == "":
+        name = role.name.replace(" ", "_")
 
     values = {
         "role": name,
