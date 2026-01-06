@@ -138,7 +138,7 @@ async def claim(
 
     await modal.wait()
     email = modal.email.value
-    values = { "email": email }
+    values = { "email": email.lower() }
 
     curr.execute(f"SELECT * FROM {config.ASSIGNMENT_TABLE} WHERE email = :email", values)
     res = curr.fetchone()
