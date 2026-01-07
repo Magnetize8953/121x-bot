@@ -8,6 +8,7 @@ import arc
 plugin = arc.GatewayPlugin("setup")
 setup = plugin.include_slash_group("setup", "Setup the server for the semester")
 roles = setup.include_subgroup("roles", "Setup server roles for the semester")
+channels = setup.include_subgroup("channels", "Setup server channels for the semester")
 
 conn: sqlite3.Connection | None = None
 curr: sqlite3.Cursor | None = None
@@ -129,6 +130,110 @@ async def file(
         conn.commit()
 
     await ctx.respond("Roles saved.")
+
+
+@channels.include
+@arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
+@arc.slash_subcommand("course", "Setup course channels for the semester")
+async def course(
+    ctx: arc.GatewayContext,
+    course: arc.Option[str, arc.StrParams("Course the channels will be for")],
+    category: arc.Option[hikari.GuildCategory, arc.ChannelParams("Category available for all course TAs")],
+    lead_category: arc.Option[hikari.GuildCategory, arc.ChannelParams("Category available for only course lead TAs")],
+) -> None:
+
+    if conn is None or curr is None:
+        raise RuntimeError("Database did not properly connect during loading")
+
+    values = { "course": course }
+    curr.execute(f"SELECT discord_id FROM {config.ROLE_TABLE} WHERE role = :course", values)
+    regular_ta_role = int(curr.fetchone()[0])
+    curr.execute(f"SELECT discord_id FROM {config.ROLE_TABLE} WHERE role = CONCAT(:course, ' Lead')", values)
+    lead_ta_role = int(curr.fetchone()[0])
+
+    guild = ctx.get_guild()
+    if guild is None:
+        raise RuntimeError("Error getting guild")
+
+    # NOTE: the permission_overwrites argument does not allow for disabling @everyone from viewing
+    # the solution used here dedpends on the category already being set to disallow @everyone from viewing channels within it
+    # each channel created within the category syncs this permission by default
+
+    # regular TA channels
+    reg_general = await guild.create_text_channel(f"{course}-general", category=category)
+    await reg_general.edit_overwrite(
+        target=regular_ta_role,
+        target_type=hikari.PermissionOverwriteType.ROLE,
+        allow=hikari.Permissions.VIEW_CHANNEL,
+    )
+    reg_shift_cov = await guild.create_text_channel(f"{course}-shift-coverage", category=category)
+    await reg_shift_cov.edit_overwrite(
+        target=regular_ta_role,
+        target_type=hikari.PermissionOverwriteType.ROLE,
+        allow=hikari.Permissions.VIEW_CHANNEL,
+    )
+
+    # lead TA channels
+    lead_general = await guild.create_text_channel(f"{course}-lead-general", category=lead_category)
+    await lead_general.edit_overwrite(
+        target=lead_ta_role,
+        target_type=hikari.PermissionOverwriteType.ROLE,
+        allow=hikari.Permissions.VIEW_CHANNEL,
+    )
+    lead_shift_cov = await guild.create_text_channel(f"{course}-lead-shift-coverage", category=lead_category)
+    await lead_shift_cov.edit_overwrite(
+        target=lead_ta_role,
+        target_type=hikari.PermissionOverwriteType.ROLE,
+        allow=hikari.Permissions.VIEW_CHANNEL,
+    )
+
+    await ctx.respond("Course channels created")
+
+
+@channels.include
+@arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
+@arc.slash_subcommand("team", "Setup team channels for the semester")
+async def team(
+    ctx: arc.GatewayContext,
+    category: arc.Option[hikari.GuildCategory, arc.ChannelParams("Teams category")],
+    team_prefix: arc.Option[str, arc.StrParams("Common prefix for team role names")] = "Team ",
+) -> None:
+
+    if conn is None or curr is None:
+        raise RuntimeError("Database did not properly connect during loading")
+
+    curr.execute(f"SELECT DISTINCT team FROM {config.ASSIGNMENT_TABLE} WHERE team <> ''")
+    teams = [name[0] for name in curr.fetchall()]
+    if len(teams) == 0:
+        raise RuntimeError("No teams found")
+
+    guild = ctx.get_guild()
+    if guild is None:
+        raise RuntimeError("Error getting guild")
+
+    # NOTE: the permission_overwrites argument does not allow for disabling @everyone from viewing
+    # the solution used here dedpends on the category already being set to disallow @everyone from viewing channels within it
+    # each channel created within the category syncs this permission by default
+
+    for team in teams:
+        values = { "team": team }
+        curr.execute(f"SELECT discord_id FROM {config.ROLE_TABLE} WHERE role = :team", values)
+        role_id = int(curr.fetchone()[0])
+
+        role = guild.get_role(role_id)
+        if role is None:
+            label = team
+        else:
+            label = role.name.replace(team_prefix, "")
+
+        team_channel = await guild.create_text_channel(f"team-{label}", category=category)
+        await team_channel.edit_overwrite(
+            target=role_id,
+            target_type=hikari.PermissionOverwriteType.ROLE,
+            allow=hikari.Permissions.VIEW_CHANNEL,
+        )
+
+    await ctx.respond("Team channels created")
 
 
 # TODO: reset server by archiving channels, renaming, repositioning, and hiding roles
