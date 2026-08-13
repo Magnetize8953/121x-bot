@@ -13,7 +13,8 @@ DATABASE_PATH: str = ""
 ASSIGNMENT_TABLE: str = ""
 TA_TABLE: str = ""
 ROLE_TABLE: str = ""
+CHANNEL_TABLE: str = ""
 
 # university email domains, do not include @
 # put primary email domain at index 0
-DOMAINS = [""]
+DOMAINS: list[str] = [""]

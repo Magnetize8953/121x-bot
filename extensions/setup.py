@@ -156,37 +156,30 @@ async def course(
         raise RuntimeError("Error getting guild")
 
     # NOTE: the permission_overwrites argument does not allow for disabling @everyone from viewing
-    # the solution used here dedpends on the category already being set to disallow @everyone from viewing channels within it
+    # the solution used here depends on the category already being set to disallow @everyone from viewing channels within it
     # each channel created within the category syncs this permission by default
 
-    # regular TA channels
-    reg_general = await guild.create_text_channel(f"{course}-general", category=category)
-    await reg_general.edit_overwrite(
-        target=regular_ta_role,
-        target_type=hikari.PermissionOverwriteType.ROLE,
-        allow=hikari.Permissions.VIEW_CHANNEL,
+    triplets = (
+        (regular_ta_role, "reg",  category),
+        (lead_ta_role,    "lead", lead_category)
     )
-    reg_shift_cov = await guild.create_text_channel(f"{course}-shift-coverage", category=category)
-    await reg_shift_cov.edit_overwrite(
-        target=regular_ta_role,
-        target_type=hikari.PermissionOverwriteType.ROLE,
-        allow=hikari.Permissions.VIEW_CHANNEL,
-    )
+    for role, position, cat in triplets:
+        for channel_type in ("general", "shift-coverage"):
 
-    # lead TA channels
-    lead_general = await guild.create_text_channel(f"{course}-lead-general", category=lead_category)
-    await lead_general.edit_overwrite(
-        target=lead_ta_role,
-        target_type=hikari.PermissionOverwriteType.ROLE,
-        allow=hikari.Permissions.VIEW_CHANNEL,
-    )
-    lead_shift_cov = await guild.create_text_channel(f"{course}-lead-shift-coverage", category=lead_category)
-    await lead_shift_cov.edit_overwrite(
-        target=lead_ta_role,
-        target_type=hikari.PermissionOverwriteType.ROLE,
-        allow=hikari.Permissions.VIEW_CHANNEL,
-    )
+            channel_name = f"{course}-{"" if position == "reg" else "lead-"}{channel_type}"
+            channel = await guild.create_text_channel(channel_name, category=cat)
+            await channel.edit_overwrite(
+                target=role,
+                target_type=hikari.PermissionOverwriteType.ROLE,
+                allow=hikari.Permissions.VIEW_CHANNEL,
+            )
+            values = {
+                "channel": channel_name,
+                "discord_id": channel.id,
+            }
+            curr.execute(f"INSERT INTO {config.CHANNEL_TABLE} VALUES(:channel, :discord_id)", values)
 
+    conn.commit()
     await ctx.respond("Course channels created")
 
 
@@ -212,7 +205,7 @@ async def team(
         raise RuntimeError("Error getting guild")
 
     # NOTE: the permission_overwrites argument does not allow for disabling @everyone from viewing
-    # the solution used here dedpends on the category already being set to disallow @everyone from viewing channels within it
+    # the solution used here depends on the category already being set to disallow @everyone from viewing channels within it
     # each channel created within the category syncs this permission by default
 
     for team in teams:
@@ -232,7 +225,13 @@ async def team(
             target_type=hikari.PermissionOverwriteType.ROLE,
             allow=hikari.Permissions.VIEW_CHANNEL,
         )
+        values = {
+            "channel": f"team-{team}",
+            "discord_id": team_channel.id,
+        }
+        curr.execute(f"INSERT INTO {config.CHANNEL_TABLE} VALUES(:channel, :discord_id)", values)
 
+    conn.commit()
     await ctx.respond("Team channels created")
 
 
@@ -350,6 +349,10 @@ def loader(client: arc.GatewayClient) -> None:
         );
         CREATE TABLE IF NOT EXISTS {config.ROLE_TABLE} (
             role       TEXT PRIMARY KEY,
+            discord_id TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS {config.CHANNEL_TABLE} (
+            channel    TEXT PRIMARY KEY,
             discord_id TEXT NOT NULL
         );
     """)
