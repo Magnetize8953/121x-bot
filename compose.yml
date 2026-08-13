@@ -1,0 +1,10 @@
+services:
+  121x:
+    build:
+      context: ./
+      dockerfile: Containerfile
+    volumes:
+      - ./config.py:/app/config.py
+      - ./database.db:/app/database.db
+    environment:
+      - BOT_TOKEN= # paste bot token here
