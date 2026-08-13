@@ -102,7 +102,7 @@ async def individual(
 
 @roles.include
 @arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
-@arc.slash_subcommand("file", "Setup roles for the semester")
+@arc.slash_subcommand("file", "Add existing roles to database")
 async def file(
     ctx: arc.GatewayContext,
     csv: arc.Option[hikari.Attachment, arc.AttachmentParams("Text file following 'role,discord_id' format with heading")],
@@ -130,6 +130,34 @@ async def file(
         conn.commit()
 
     await ctx.respond("Roles saved.")
+
+
+@roles.include
+@arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
+@arc.slash_subcommand("team", "Create team roles from assignments table")
+async def team(
+    ctx: arc.GatewayContext,
+    team_prefix: arc.Option[str, arc.StrParams("Common prefix for team role names")] = "Team ",
+) -> None:
+
+    if conn is None or curr is None:
+        raise RuntimeError("Database did not properly connect during loading")
+
+    curr.execute(f"SELECT DISTINCT team FROM {config.ASSIGNMENT_TABLE} WHERE team <> ''")
+    teams = [name[0] for name in curr.fetchall()]
+    if len(teams) == 0:
+        raise RuntimeError("No teams found")
+
+    for team in teams:
+        role = await plugin.client.rest.create_role(ctx.guild_id, name=f"{team_prefix}{team}")
+        values = {
+            "role": team,
+            "discord_id": role.id,
+        }
+        curr.execute(f"INSERT INTO {config.ROLE_TABLE} VALUES(:role, :discord_id)", values)
+
+    conn.commit()
+    await ctx.respond("Created team roles.")
 
 
 @channels.include
