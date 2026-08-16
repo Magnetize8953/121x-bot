@@ -11,7 +11,6 @@ conn: sqlite3.Connection | None = None
 curr: sqlite3.Cursor | None = None
 
 @teams.include
-@arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
 @arc.slash_subcommand("emoji", "Change team emoji. There can only be one emoji. The word 'Team' will still prefix the emoji")
 async def emoji(
     ctx: arc.GatewayContext,
@@ -43,7 +42,6 @@ async def emoji(
 
 
 @teams.include
-@arc.with_hook(arc.has_permissions(hikari.Permissions.MANAGE_GUILD))
 @arc.slash_subcommand("color", "Change team colour")
 async def color(
     ctx: arc.GatewayContext,
